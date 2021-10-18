@@ -1,0 +1,18 @@
+{
+  "viewName": "resolution-report",
+  "clientName": "ebay",
+  "scheduleStartTime": "2017-12-10 10:00",
+  "scheduleEndTime": "2017-12-30 10:00",
+  "sourceTimeRangeList": [
+    {
+      "hdfsSourceViewID": "id_1",
+      "pathList": [
+        "path1",
+        "path2"
+      ],
+      "startTime": "2017-12-12 10:00",
+      "endTime": "2017-12-09 10:00"
+    }
+  ]
+}
+

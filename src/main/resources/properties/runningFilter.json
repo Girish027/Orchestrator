@@ -1,0 +1,35 @@
+{
+  "_source": [
+    "_id"
+  ],
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "match": {
+            "workflowStatus_keyword": "RUNNING"
+          }
+        },
+        {
+          "match": {
+            "clientName_keyword": "$CLIENT_NAME"
+          }
+        },
+        {
+          "match": {
+            "viewName_keyword": "$VIEW_NAME"
+          }
+        }
+      ],
+      "filter": [
+        {
+          "range": {
+            "actualStart_time": {
+              "lte": "now-$SLA_TIME"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

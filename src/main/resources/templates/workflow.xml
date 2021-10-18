@@ -1,0 +1,178 @@
+<workflow-app xmlns='uri:oozie:workflow:0.1' name='${viewName}_${clientName}_${ucInstanceDate}'>
+    <start to='PreprocessTask' />
+
+    <action name="PreprocessTask">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+                <property>
+                    <name>oozie.launcher.mapreduce.task.classpath.user.precedence</name>
+                    <value>true</value>
+                </property>
+            </configuration>
+            <main-class>com.tfs.orchestrator.tasks.PreprocessingTask</main-class>
+            <java-opts> -Dhadoop.config.dir=${hdfsConfigDir} -Duser.timezone=UTC -Dreplay.task=${replayTask} -Dproperties.hdfs.dir=${hdfsPropertiesDir}</java-opts>
+            <arg>${clientName}</arg>
+            <arg>${viewName}</arg>
+            <arg>${ucInstanceDate}</arg>
+            <arg>${jobComplexity}</arg>
+            <file>${nameNode}/var/spartan-jars/log4j2.properties</file>
+            <capture-output/>
+        </java>
+        <ok to="input_availability"/>
+        <error to="SlaPublish2"/>
+    </action>
+
+    <decision name="input_availability">
+        <switch>
+            <case to="ProcessingTask">
+                ${!waitForInputAvailability or (wf:actionData('PreprocessTask')['INPUT_AVAILABLE'] eq 'true')}
+            </case>
+            <default to="sleepTask" />
+        </switch>
+    </decision>
+
+    <action name='sleepTask'>
+        <shell xmlns="uri:oozie:shell-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <exec>sleep_script.sh</exec>
+            <argument>${sleepTime}</argument>
+            <file>${nameNode}/user/oozie/dp2/scripts/sleep_script.sh</file> <!--Copy the executable to compute node's current working directory -->
+        </shell>
+        <ok to="ProcessingTask" />
+        <error to="SlaPublish2" />
+    </action>
+
+    <action name="ProcessingTask">
+        <shell xmlns="uri:oozie:shell-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+                <property>
+                    <name>yarn.nodemanager.pmem-check-enabled</name>
+                    <value>false</value>
+                </property>
+                <property>
+                    <name>oozie.launcher.mapreduce.user.classpath.first</name>
+                    <value>true</value>
+                </property>
+            </configuration>
+            <exec>process_script.sh</exec>
+            <argument>${viewName}</argument>
+            <argument>${clientName}</argument>
+            <argument>${wf:actionData('PreprocessTask')['START_TIME']}</argument>
+            <argument>${wf:actionData('PreprocessTask')['END_TIME']}</argument>
+            <env-var>HADOOP_USER_NAME=${wf:user()}</env-var>
+            <file>${nameNode}/user/oozie/dp2/scripts/process_script.sh#process_script.sh</file> <!--Copy the executable to compute node's current working directory -->
+        </shell>
+        <ok to="PublishTask"/>
+        <error to="SlaPublish2"/>
+    </action>
+
+    <decision name="output_availability">
+        <switch>
+            <case to="PublishTask">
+                ${defaultPublish and (skipOutputCheck or fs:exists(concat(wf:actionData('PreprocessTask')['OUTPUT_PATH'], '/_SUCCESS')))}
+            </case>
+            <case to="SlaPublish2">
+                ${defaultPublish and !fs:exists(concat(wf:actionData('PreprocessTask')['OUTPUT_VIEW'], '/_SUCCESS'))}
+            </case>
+            <default to="SlaPublish1" />
+        </switch>
+    </decision>
+
+    <action name="PublishTask">
+        <shell xmlns="uri:oozie:shell-action:0.1">
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+                <property>
+                    <name>oozie.launcher.mapreduce.user.classpath.first</name>
+                    <value>true</value>
+                </property>
+            </configuration>
+            <exec>ingest_script.sh</exec>
+            <argument>${clientName}</argument>
+            <argument>${viewName}</argument>
+            <argument>${wf:actionData('PreprocessTask')['START_EPOCH_TIME']}</argument>
+            <argument>${wf:actionData('PreprocessTask')['END_EPOCH_TIME']}</argument>
+            <env-var>HADOOP_USER_NAME=${wf:user()}</env-var>
+            <file>${nameNode}/user/oozie/dp2/scripts/ingest_script.sh#ingest_script.sh</file> <!--Copy the executable to compute node's current working directory -->
+        </shell>
+        <ok to="SlaPublish1"/>
+        <error to="SlaPublish2"/>
+    </action>
+
+    <action name="SlaPublish1">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <main-class>com.tfs.orchestrator.tasks.SlaPublishTask</main-class>
+            <java-opts> -Dhadoop.config.dir=${hdfsConfigDir} -Duser.timezone=UTC -Dproperties.hdfs.dir=${hdfsPropertiesDir}</java-opts>
+            <arg>${clientName}</arg>
+            <arg>${viewName}</arg>
+            <arg>${ucInstanceDate}</arg>
+            <arg>${wf:actionData('PreprocessTask')['START_EPOCH_TIME']}</arg>
+            <arg>${wf:actionData('PreprocessTask')['END_EPOCH_TIME']}</arg>
+            <file>${nameNode}/var/spartan-jars/log4j2.properties</file>
+            <capture-output/>
+        </java>
+        <ok to="end"/>
+        <error to="fail"/>
+    </action>
+
+    <action name="SlaPublish2">
+        <java>
+            <job-tracker>${jobTracker}</job-tracker>
+            <name-node>${nameNode}</name-node>
+            <configuration>
+                <property>
+                    <name>mapred.job.queue.name</name>
+                    <value>${queueName}</value>
+                </property>
+            </configuration>
+            <main-class>com.tfs.orchestrator.tasks.SlaPublishTask</main-class>
+            <java-opts> -Dhadoop.config.dir=${hdfsConfigDir} -Duser.timezone=UTC -Dproperties.hdfs.dir=${hdfsPropertiesDir}</java-opts>
+            <arg>${clientName}</arg>
+            <arg>${viewName}</arg>
+            <arg>${ucInstanceDate}</arg>
+            <arg>${wf:actionData('PreprocessTask')['START_EPOCH_TIME']}</arg>
+            <arg>${wf:actionData('PreprocessTask')['END_EPOCH_TIME']}</arg>
+            <file>${nameNode}/var/spartan-jars/log4j2.properties</file>
+            <capture-output/>
+        </java>
+        <ok to="fail"/>
+        <error to="fail"/>
+    </action>
+
+    <kill name="fail">
+        <message>Job failed, error message[${wf:errorMessage(wf:lastErrorNode())}]</message>
+    </kill>
+    <end name='end' />
+</workflow-app>

@@ -1,0 +1,43 @@
+{
+  "_all": {
+    "enabled": true
+  },
+  "properties": {
+    "viewName_keyword": {
+      "type": "text"
+    },
+    "clientName_keyword": {
+      "type": "text"
+    },
+    "jobSchedule_time": {
+      "type": "date"
+    },
+    "actualStart_time": {
+      "type": "date"
+    },
+    "actualEnd_time": {
+      "type": "date"
+    },
+    "duration": {
+      "type": "long"
+    },
+    "dataStart_time": {
+      "type": "date"
+    },
+    "dataEnd_time": {
+      "type": "date"
+    },
+    "_id": {
+      "type": "text"
+    },
+    "workflowStatus_keyword": {
+      "type": "text"
+    },
+    "dqStatus_keyword": {
+      "type": "text"
+    },
+    "stages": {
+      "type": "nested"
+    }
+  }
+}

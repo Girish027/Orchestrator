@@ -1,0 +1,18 @@
+<coordinator-app name="${viewName}_${clientName}" frequency="${cronExpression}"
+                 start="${jobStartTime}" end="${jobEndTime}" timezone="UTC"
+                 xmlns="uri:oozie:coordinator:0.1">
+
+    <action>
+        <workflow>
+            <app-path>${workflowForCoord}</app-path>
+            <configuration>
+                <property>
+                    <name>ucInstanceDate</name>
+                    <value>
+                        ${coord:formatTime(coord:nominalTime(),"yyyy-MM-dd'T'HH:mm'Z'")}
+                    </value>
+                </property>
+            </configuration>
+        </workflow>
+    </action>
+</coordinator-app>

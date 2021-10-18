@@ -1,0 +1,27 @@
+{
+  "_source": [ "event_count" ],
+  "query":
+  {
+    "bool":{
+      "must":[
+        {
+          "range" : {
+            "ingestion_time" : {
+              "lte" : "$EXECUTION_TIME"
+            }
+          }
+        },
+        {
+          "term": {
+            "outputPath_keyword": {
+              "value": "$DATA_PATH"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "aggs" : {
+    "total_event" : { "sum" : { "field" : "event_count" } }
+  }
+}
